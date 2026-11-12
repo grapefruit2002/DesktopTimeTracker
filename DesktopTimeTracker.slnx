@@ -1,0 +1,5 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/DesktopTimeTracker/DesktopTimeTracker.csproj" />
+  </Folder>
+</Solution>

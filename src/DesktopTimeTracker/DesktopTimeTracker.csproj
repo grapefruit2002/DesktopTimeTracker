@@ -1,0 +1,59 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
+    <SupportedOSPlatformVersion>10.0.17763.0</SupportedOSPlatformVersion>
+    <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>DesktopTimeTracker</RootNamespace>
+    <AssemblyName>DesktopTimeTracker</AssemblyName>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>Assets\app.ico</ApplicationIcon>
+    <Version>1.0.0</Version>
+    <Product>桌面时长记录器</Product>
+    <AssemblyTitle>桌面时长记录器</AssemblyTitle>
+    <InvariantGlobalization>false</InvariantGlobalization>
+    <SatelliteResourceLanguages>zh-Hans;en</SatelliteResourceLanguages>
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+    <!-- WPF reads PerMonitorV2 from app.manifest itself; the WinForms DPI analyzer
+         does not apply to a WPF-primary app that only uses WinForms for the tray icon. -->
+    <NoWarn>$(NoWarn);WFO0003</NoWarn>
+    <!-- 项目引用了 WindowsAppSDK，会被 WebView2 包误判为 WinRT 场景而只引用投影程序集，
+         导致找不到 WPF 的 WebView2 控件。这里强制使用标准 WPF 程序集。 -->
+    <WebView2EnableCsWinRTProjection>false</WebView2EnableCsWinRTProjection>
+    <WebView2UseWinRT>false</WebView2UseWinRT>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.13" />
+    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.4314.35" />
+    <PackageReference Include="Microsoft.WindowsAppSDK" Version="2.6.5" />
+  </ItemGroup>
+
+  <!-- WinForms is only needed for the tray icon; its implicit usings collide with WPF
+       (Application, MessageBox, SaveFileDialog), so keep them out of the global scope. -->
+  <ItemGroup>
+    <Using Remove="System.Windows.Forms" />
+    <Using Remove="System.Drawing" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Resource Include="Assets\app.ico" />
+    <Content Remove="Assets\anime_bg.png" />
+    <Resource Include="Assets\anime_bg.png" />
+    <Resource Include="Assets\mascot.jpg" />
+    <Resource Include="Assets\mascot.png" />
+  </ItemGroup>
+
+  <!-- 桌宠网页资源（three.js / three-vrm / html）复制到输出与发布目录 -->
+  <ItemGroup>
+    <None Update="Assets\Web\**\*">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </None>
+  </ItemGroup>
+
+</Project>
