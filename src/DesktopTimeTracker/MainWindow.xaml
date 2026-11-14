@@ -28,7 +28,7 @@
     <Grid>
 
         <!-- Pack URI makes the bundled image load consistently in debug and published builds. -->
-        <Image Source="pack://application:,,,/Assets/anime_bg.png" Stretch="Uniform"
+        <Image x:Name="BgImage" Source="pack://application:,,,/Assets/anime_bg.png" Stretch="Uniform"
                HorizontalAlignment="Right" VerticalAlignment="Top"
                Opacity="0.52" IsHitTestVisible="False" />
 
@@ -45,17 +45,28 @@
         <Grid Grid.Row="0" Margin="2,4,2,6" Background="Transparent"
               MouseLeftButtonDown="OnHeaderMouseLeftButtonDown">
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                <Button Style="{StaticResource WindowButton}" Content="─" ToolTip="最小化"
+                <!-- 快捷：主题 / 桌宠 / 背景 / 保存 -->
+                <Button Style="{DynamicResource WindowButton}" Content="🎨" ToolTip="切换主题"
+                        Click="OnThemeQuickClick" />
+                <Button Style="{DynamicResource WindowButton}" Content="🐾" ToolTip="桌宠模型"
+                        Click="OnPetQuickClick" />
+                <Button Style="{DynamicResource WindowButton}" Content="🖼" ToolTip="切换背景"
+                        Click="OnBackgroundQuickClick" />
+                <Button Style="{DynamicResource WindowButton}" Content="💾" ToolTip="保存设置"
+                        Click="OnSaveQuickClick" />
+                <Border Width="6" />
+                <!-- 窗口控制 -->
+                <Button Style="{DynamicResource WindowButton}" Content="─" ToolTip="最小化"
                         Click="OnMinimizeClick" />
-                <Button x:Name="MaxButton" Style="{StaticResource WindowButton}" Content="▢" ToolTip="最大化"
+                <Button x:Name="MaxButton" Style="{DynamicResource WindowButton}" Content="▢" ToolTip="最大化"
                         Click="OnMaximizeClick" />
-                <Button Style="{StaticResource WindowButton}" Content="✕" ToolTip="关闭到托盘"
-                        Foreground="{StaticResource RedBrush}" Click="OnCloseClick" />
+                <Button Style="{DynamicResource WindowButton}" Content="✕" ToolTip="关闭到托盘"
+                        Foreground="{DynamicResource RedBrush}" Click="OnCloseClick" />
             </StackPanel>
         </Grid>
 
         <!-- ================= HEADER ================= -->
-        <Border Grid.Row="1" Style="{StaticResource Card}" Padding="20,16" Margin="0,0,0,16"
+        <Border Grid.Row="1" Style="{DynamicResource Card}" Padding="20,16" Margin="0,0,0,8"
                 MouseLeftButtonDown="OnHeaderMouseLeftButtonDown">
             <Grid>
                 <Grid.ColumnDefinitions>
@@ -65,96 +76,58 @@
                 </Grid.ColumnDefinitions>
 
                 <!-- brand -->
-                <StackPanel Grid.Column="0" Orientation="Horizontal" Margin="0,0,22,0">
-                    <Border Width="46" Height="46" CornerRadius="13" Background="{StaticResource AccentDimBrush}"
-                            BorderBrush="{StaticResource BorderStrongBrush}" BorderThickness="1" Padding="8">
+                <StackPanel Grid.Column="0" Orientation="Horizontal">
+                    <Border Width="42" Height="42" CornerRadius="12" Background="{DynamicResource AccentDimBrush}"
+                            BorderBrush="{DynamicResource BorderStrongBrush}" BorderThickness="1" Padding="7">
                         <Image Source="Assets/app.ico" VerticalAlignment="Center"
                                RenderOptions.BitmapScalingMode="HighQuality" />
                     </Border>
-                    <StackPanel Margin="13,0,0,0" VerticalAlignment="Center">
+                </StackPanel>
+
+                <!-- current activity -->
+                <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="24,0,0,0" Orientation="Horizontal">
+                    <Ellipse Width="10" Height="10" VerticalAlignment="Center" Margin="0,0,12,0">
+                        <Ellipse.Style>
+                            <Style TargetType="Ellipse">
+                                <Setter Property="Fill" Value="{DynamicResource MutedBrush}" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsRecording}" Value="True">
+                                        <Setter Property="Fill" Value="{DynamicResource GreenBrush}" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Ellipse.Style>
+                    </Ellipse>
+                    <StackPanel>
                         <StackPanel Orientation="Horizontal">
-                            <Border CornerRadius="10" Padding="9,3" Background="{StaticResource CyanDimBrush}"
-                                    BorderBrush="#F6BBD6" BorderThickness="1">
-                                <StackPanel Orientation="Horizontal">
-                                    <Ellipse Width="7" Height="7" Margin="0,0,7,0" VerticalAlignment="Center">
-                                        <Ellipse.Style>
-                                            <Style TargetType="Ellipse">
-                                                <Setter Property="Fill" Value="{StaticResource MutedBrush}" />
-                                                <Style.Triggers>
-                                                    <DataTrigger Binding="{Binding IsAway}" Value="True">
-                                                        <Setter Property="Fill" Value="{StaticResource AmberBrush}" />
-                                                    </DataTrigger>
-                                                    <DataTrigger Binding="{Binding IsRecording}" Value="True">
-                                                        <Setter Property="Fill" Value="{StaticResource GreenBrush}" />
-                                                    </DataTrigger>
-                                                </Style.Triggers>
-                                            </Style>
-                                        </Ellipse.Style>
-                                    </Ellipse>
-                                    <TextBlock Text="{Binding StateText}" FontSize="11.5"
-                                               Foreground="{StaticResource SubTextBrush}" />
-                                </StackPanel>
-                            </Border>
-                            <TextBlock Text="本地记录 · 不上传" FontSize="11.5" Margin="10,0,0,0"
-                                       Foreground="{StaticResource MutedBrush}" VerticalAlignment="Center" />
+                            <TextBlock Text="当前活动" FontSize="11.5" Foreground="{DynamicResource MutedBrush}" VerticalAlignment="Center" />
+                            <TextBlock Text="{Binding CurrentAppText}" FontSize="14" FontWeight="SemiBold"
+                                       Foreground="{DynamicResource TextBrush}" Margin="8,0,12,0" VerticalAlignment="Center" />
+                            <TextBlock Text="{Binding CurrentAppDurationText}" FontSize="11.5"
+                                       Foreground="{DynamicResource GreenBrush}" VerticalAlignment="Center" />
                         </StackPanel>
+                        <TextBlock Text="{Binding CurrentTitleText}" FontSize="11.5"
+                                   Foreground="{DynamicResource SubTextBrush}" Margin="0,3,0,0"
+                                   TextTrimming="CharacterEllipsis" MaxWidth="380" />
                     </StackPanel>
                 </StackPanel>
 
-                <!-- live current activity -->
-                <Border Grid.Column="1" Background="{StaticResource InputBrush}" CornerRadius="10" Padding="15,11"
-                        BorderBrush="{StaticResource BorderStrongBrush}" BorderThickness="1" VerticalAlignment="Center">
-                    <Grid>
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="Auto" />
-                        </Grid.RowDefinitions>
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="Auto" />
-                            </Grid.ColumnDefinitions>
-                            <StackPanel Orientation="Horizontal">
-                                <TextBlock Text="当前" FontSize="11.5" Foreground="{StaticResource MutedBrush}"
-                                           Margin="0,0,9,0" />
-                                <TextBlock Text="{Binding CurrentTitleText}" FontSize="12.5" Margin="0,0,0,0"
-                                           Foreground="{StaticResource SubTextBrush}" TextTrimming="CharacterEllipsis"
-                                           MaxWidth="420" ToolTip="{Binding CurrentTitleText}" />
-                            </StackPanel>
-                            <Border Grid.Column="1" Background="{StaticResource AccentDimBrush}" CornerRadius="6"
-                                    Padding="8,2" Margin="12,0,0,0">
-                                <TextBlock Text="{Binding CurrentAppDurationText}" FontSize="11.5" Foreground="{StaticResource AccentBrightBrush}" />
-                            </Border>
-                        </Grid>
-                        <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,7,0,0"
-                                    Visibility="{Binding HasCurrentUrl, Converter={StaticResource BoolVis}}">
-                            <TextBlock Text="网页" FontSize="11.5" Foreground="{StaticResource MutedBrush}"
-                                       Margin="0,0,9,0" />
-                            <TextBlock Text="{Binding CurrentUrlText}" FontSize="12" Foreground="{StaticResource PurpleBrush}"
-                                       TextTrimming="CharacterEllipsis" MaxWidth="640" ToolTip="{Binding CurrentUrlText}" />
-                            <Border Background="{StaticResource PurpleDimBrush}" CornerRadius="6" Padding="8,2" Margin="12,0,0,0">
-                                <TextBlock Text="{Binding CurrentWebDurationText}" FontSize="11.5" Foreground="{StaticResource PurpleBrush}" />
-                            </Border>
-                        </StackPanel>
-                    </Grid>
-                </Border>
-
                 <!-- today totals + actions -->
-                <StackPanel Grid.Column="2" Margin="22,0,0,0" VerticalAlignment="Center">
+                <StackPanel Grid.Column="2" VerticalAlignment="Center">
                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
                         <StackPanel Margin="0,0,22,0">
-                            <TextBlock Text="今日活跃" FontSize="11.5" Foreground="{StaticResource MutedBrush}" />
+                            <TextBlock Text="今日活跃" FontSize="11.5" Foreground="{DynamicResource MutedBrush}" />
                             <TextBlock Text="{Binding TodayActiveText}" FontSize="23" FontWeight="Bold"
-                                       Foreground="{StaticResource GreenBrush}" Margin="0,3,0,0" />
+                                       Foreground="{DynamicResource GreenBrush}" Margin="0,3,0,0" />
                         </StackPanel>
                         <StackPanel>
-                            <TextBlock Text="离开" FontSize="11.5" Foreground="{StaticResource MutedBrush}" />
+                            <TextBlock Text="离开" FontSize="11.5" Foreground="{DynamicResource MutedBrush}" />
                             <TextBlock Text="{Binding TodayAwayText}" FontSize="23" FontWeight="SemiBold"
-                                       Foreground="{StaticResource SubTextBrush}" Margin="0,3,0,0" />
+                                       Foreground="{DynamicResource SubTextBrush}" Margin="0,3,0,0" />
                         </StackPanel>
                     </StackPanel>
                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,11,0,0">
-                        <Button Content="{Binding ToggleButtonText}" Style="{StaticResource AccentButton}"
+                        <Button Content="{Binding ToggleButtonText}" Style="{DynamicResource AccentButton}"
                                 Command="{Binding ToggleTrackingCommand}" MinWidth="96" />
                         <Button Content="刷新" Margin="8,0,0,0" Command="{Binding RefreshCommand}" />
                     </StackPanel>
@@ -242,48 +215,6 @@
                                 </StackPanel>
                             </Border>
                         </UniformGrid>
-
-                        <!-- hour distribution -->
-                        <Border Style="{StaticResource Card}" Margin="0,0,0,14">
-                            <StackPanel>
-                                <Grid Margin="0,0,0,14">
-                                    <TextBlock Text="24 小时分布" Style="{StaticResource CardTitle}" Margin="0" />
-                                    <TextBlock Text="跨小时会话按秒拆分归属" HorizontalAlignment="Right"
-                                               Style="{StaticResource Muted}" />
-                                </Grid>
-                                <ItemsControl ItemsSource="{Binding HourBars}">
-                                    <ItemsControl.ItemsPanel>
-                                        <ItemsPanelTemplate>
-                                            <UniformGrid Rows="1" />
-                                        </ItemsPanelTemplate>
-                                    </ItemsControl.ItemsPanel>
-                                    <ItemsControl.ItemTemplate>
-                                        <DataTemplate>
-                                            <Grid Margin="2,0">
-                                                <Grid.RowDefinitions>
-                                                    <RowDefinition Height="88" />
-                                                    <RowDefinition Height="Auto" />
-                                                </Grid.RowDefinitions>
-                                                <Border Background="{StaticResource TrackBrush}" CornerRadius="4" VerticalAlignment="Stretch" />
-                                                <Border VerticalAlignment="Bottom" CornerRadius="4,4,0,0"
-                                                        Height="{Binding Ratio, Converter={StaticResource RatioHeight}, ConverterParameter=88}"
-                                                        ToolTip="{Binding Text}">
-                                                    <Border.Background>
-                                                        <LinearGradientBrush StartPoint="0,1" EndPoint="0,0">
-                                                            <GradientStop Color="#F27BAE" Offset="0" />
-                                                            <GradientStop Color="#A88BEB" Offset="1" />
-                                                        </LinearGradientBrush>
-                                                    </Border.Background>
-                                                </Border>
-                                                <TextBlock Grid.Row="1" Text="{Binding Label}" FontSize="9.5"
-                                                           Foreground="{StaticResource MutedBrush}"
-                                                           HorizontalAlignment="Center" Margin="0,6,0,0" />
-                                            </Grid>
-                                        </DataTemplate>
-                                    </ItemsControl.ItemTemplate>
-                                </ItemsControl>
-                            </StackPanel>
-                        </Border>
 
                         <!-- rankings -->
                         <Grid Margin="0,0,0,14">
@@ -399,6 +330,48 @@
                             </Border>
                         </Grid>
 
+                        <!-- hour distribution -->
+                        <Border Style="{StaticResource Card}" Margin="0,0,0,14">
+                            <StackPanel>
+                                <Grid Margin="0,0,0,14">
+                                    <TextBlock Text="24 小时分布" Style="{StaticResource CardTitle}" Margin="0" />
+                                    <TextBlock Text="跨小时会话按秒拆分归属" HorizontalAlignment="Right"
+                                               Style="{StaticResource Muted}" />
+                                </Grid>
+                                <ItemsControl ItemsSource="{Binding HourBars}">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate>
+                                            <UniformGrid Rows="1" />
+                                        </ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Grid Margin="2,0">
+                                                <Grid.RowDefinitions>
+                                                    <RowDefinition Height="88" />
+                                                    <RowDefinition Height="Auto" />
+                                                </Grid.RowDefinitions>
+                                                <Border Background="{StaticResource TrackBrush}" CornerRadius="4" VerticalAlignment="Stretch" />
+                                                <Border VerticalAlignment="Bottom" CornerRadius="4,4,0,0"
+                                                        Height="{Binding Ratio, Converter={StaticResource RatioHeight}, ConverterParameter=88}"
+                                                        ToolTip="{Binding Text}">
+                                                    <Border.Background>
+                                                        <LinearGradientBrush StartPoint="0,1" EndPoint="0,0">
+                                                            <GradientStop Color="#F27BAE" Offset="0" />
+                                                            <GradientStop Color="#A88BEB" Offset="1" />
+                                                        </LinearGradientBrush>
+                                                    </Border.Background>
+                                                </Border>
+                                                <TextBlock Grid.Row="1" Text="{Binding Label}" FontSize="9.5"
+                                                           Foreground="{StaticResource MutedBrush}"
+                                                           HorizontalAlignment="Center" Margin="0,6,0,0" />
+                                            </Grid>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
+                        </Border>
+
                         <!-- category breakdown -->
                         <Border Style="{StaticResource Card}" Margin="0,0,0,14">
                             <StackPanel>
@@ -406,8 +379,8 @@
                                     <TextBlock Text="分类占比" Style="{StaticResource CardTitle}" Margin="0" />
                                     <TextBlock Text="工作 / 娱乐 / 学习…" HorizontalAlignment="Right" Style="{StaticResource Muted}" />
                                 </Grid>
-                                <Border Background="{StaticResource TrackBrush}" CornerRadius="6" Height="18">
-                                    <ItemsControl ItemsSource="{Binding Categories}" Height="18">
+                                <Border Background="{StaticResource TrackBrush}" CornerRadius="11" Height="22">
+                                    <ItemsControl ItemsSource="{Binding Categories}" Height="22">
                                         <ItemsControl.ItemsPanel>
                                             <ItemsPanelTemplate>
                                                 <StackPanel Orientation="Horizontal" />
@@ -416,7 +389,7 @@
                                         <ItemsControl.ItemTemplate>
                                             <DataTemplate>
                                                 <Border Width="{Binding Share, Converter={StaticResource RatioWidth}, ConverterParameter=760}"
-                                                        Height="18" Background="{Binding Category, Converter={StaticResource CategoryBrush}}" />
+                                                        Height="22" Background="{Binding Category, Converter={StaticResource CategoryBrush}}" />
                                             </DataTemplate>
                                         </ItemsControl.ItemTemplate>
                                     </ItemsControl>
@@ -429,14 +402,19 @@
                                     </ItemsControl.ItemsPanel>
                                     <ItemsControl.ItemTemplate>
                                         <DataTemplate>
-                                            <StackPanel Orientation="Horizontal" Margin="0,0,22,8">
-                                                <Ellipse Width="9" Height="9" Fill="{Binding Category, Converter={StaticResource CategoryBrush}}" VerticalAlignment="Center" />
-                                                <TextBlock Margin="6,0,4,0" FontSize="12">
-                                                    <Run Text="{Binding Category}" /><Run Text=" " /><Run Text="{Binding Seconds, Converter={StaticResource DurationCompact}, Mode=OneWay}" />
-                                                </TextBlock>
-                                                <TextBlock Foreground="{StaticResource MutedBrush}" FontSize="12"
-                                                           Text="{Binding Share, Converter={StaticResource Percent}}" />
-                                            </StackPanel>
+                                            <Border Background="{StaticResource InputBrush}" CornerRadius="10"
+                                                    Padding="10,5" Margin="0,0,8,8">
+                                                <StackPanel Orientation="Horizontal">
+                                                    <Ellipse Width="8" Height="8" Fill="{Binding Category, Converter={StaticResource CategoryBrush}}" VerticalAlignment="Center" />
+                                                    <TextBlock Margin="6,0,4,0" FontSize="12" Foreground="{StaticResource TextBrush}">
+                                                        <Run Text="{Binding Category}" />
+                                                    </TextBlock>
+                                                    <TextBlock Foreground="{StaticResource SubTextBrush}" FontSize="12"
+                                                               Text="{Binding Seconds, Converter={StaticResource DurationCompact}, Mode=OneWay}" />
+                                                    <TextBlock Foreground="{StaticResource MutedBrush}" FontSize="12" Margin="6,0,0,0"
+                                                               Text="{Binding Share, Converter={StaticResource Percent}}" />
+                                                </StackPanel>
+                                            </Border>
                                         </DataTemplate>
                                     </ItemsControl.ItemTemplate>
                                 </ItemsControl>
@@ -1062,42 +1040,96 @@
                         <Border Style="{StaticResource Card}" Margin="0,0,0,14">
                             <StackPanel>
                                 <TextBlock Text="桌宠提示文案" Style="{StaticResource CardTitle}" />
-                                <TextBlock Text="每行一条，随机选取；空行忽略，全部留空恢复默认。点击下方“保存设置”后立即生效。"
+                                <TextBlock Text="点击桌宠时随机选取一句；每行一条，空行忽略，全部留空恢复默认。左键 / 右键合并触发，2 秒冷却防卡死。"
                                            Style="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,0,0,12" />
-                                <TextBlock Text="点击桌宠时的提示" Margin="0,0,0,6" />
                                 <TextBox Text="{Binding PetClickLinesText, UpdateSourceTrigger=PropertyChanged}"
                                          AutomationProperties.Name="点击桌宠时的提示"
                                          AcceptsReturn="True" Height="140" TextWrapping="Wrap"
                                          VerticalScrollBarVisibility="Auto" VerticalContentAlignment="Top" />
-                                <TextBlock Text="右键“说句话”的随机文案" Margin="0,14,0,6" />
-                                <TextBox Text="{Binding PetMenuLinesText, UpdateSourceTrigger=PropertyChanged}"
-                                         AutomationProperties.Name="右键说句话的随机文案"
-                                         AcceptsReturn="True" Height="120" TextWrapping="Wrap"
-                                         VerticalScrollBarVisibility="Auto" VerticalContentAlignment="Top" />
-                                <TextBlock Text="右键“说句话”仍可能播报今日统计；喝水、久坐、目标达成等定时提醒不受这里影响。"
+                                <TextBlock Text="喝水、久坐、目标达成等定时提醒不受这里影响，由计时逻辑独立触发。"
                                            Style="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,8,0,0" />
                             </StackPanel>
                         </Border>
 
                         <Border Style="{StaticResource Card}" Margin="0,0,0,14">
                             <StackPanel>
-                                <TextBlock Text="忽略的应用" Style="{StaticResource CardTitle}" />
-                                <TextBox Text="{Binding IgnoredProcessesText, UpdateSourceTrigger=PropertyChanged}"
-                                         AcceptsReturn="True" Height="62" TextWrapping="Wrap"
-                                         VerticalScrollBarVisibility="Auto" VerticalContentAlignment="Top" />
-                                <TextBlock Text="进程名，用逗号或空格分隔，例如：explorer, SearchHost。被忽略的应用仍计入桌面活跃时长，但不生成应用/网页记录。"
-                                           Style="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,8,0,0" />
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="14" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel>
+                                        <TextBlock Text="忽略的应用" Style="{StaticResource CardTitle}" Margin="0,0,0,6" />
+                                        <TextBox Text="{Binding IgnoredProcessesText, UpdateSourceTrigger=PropertyChanged}"
+                                                 AcceptsReturn="True" Height="110" TextWrapping="Wrap"
+                                                 VerticalScrollBarVisibility="Auto" VerticalContentAlignment="Top" />
+                                        <TextBlock Text="进程名，逗号或空格分隔，例如 explorer, SearchHost。被忽略的应用仍计入桌面活跃时长，但不生成记录。"
+                                                   Style="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,6,0,0" />
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="2">
+                                        <TextBlock Text="应用分类" Style="{StaticResource CardTitle}" Margin="0,0,0,6" />
+                                        <TextBox Text="{Binding CategoryRulesText, UpdateSourceTrigger=PropertyChanged}"
+                                                 AcceptsReturn="True" Height="110" TextWrapping="Wrap"
+                                                 VerticalScrollBarVisibility="Auto" VerticalContentAlignment="Top" />
+                                        <TextBlock Text="每行一条规则：进程名或域名 = 分类，例如 idea64=工作、bilibili.com=娱乐。"
+                                                   Style="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,6,0,0" />
+                                    </StackPanel>
+                                </Grid>
+                                <Border Background="{StaticResource TrackBrush}" CornerRadius="6" Padding="10,6" Margin="0,12,0,0">
+                                    <TextBlock Text="分类可选：工作 / 沟通 / 上网 / 娱乐 / 学习 / 其他。未匹配的应用归「其他」，未匹配的网址归「上网」。"
+                                               Style="{StaticResource Muted}" TextWrapping="Wrap" />
+                                </Border>
                             </StackPanel>
                         </Border>
 
+                        <!-- 背景 -->
                         <Border Style="{StaticResource Card}" Margin="0,0,0,14">
                             <StackPanel>
-                                <TextBlock Text="应用分类" Style="{StaticResource CardTitle}" />
-                                <TextBox Text="{Binding CategoryRulesText, UpdateSourceTrigger=PropertyChanged}"
-                                         AcceptsReturn="True" Height="82" TextWrapping="Wrap"
-                                         VerticalScrollBarVisibility="Auto" VerticalContentAlignment="Top" />
-                                <TextBlock Text="每行一条规则：进程名或域名=分类，例如 idea64=工作、bilibili.com=娱乐。分类可选：工作 / 沟通 / 上网 / 娱乐 / 学习 / 其他。未匹配的应用归“其他”，未匹配的网址归“上网”。"
-                                           Style="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,8,0,0" />
+                                <TextBlock Text="背景" Style="{StaticResource CardTitle}" Margin="0,0,0,6" />
+                                <Grid Margin="0,0,0,10">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <ComboBox ItemsSource="{Binding BackgroundChoices}"
+                                              SelectedValue="{Binding SelectedBackgroundId, Mode=TwoWay}"
+                                              SelectedValuePath="Id"
+                                              DisplayMemberPath="Name" />
+                                    <Button Grid.Column="1" Content="导入图片…" Margin="10,0,0,0"
+                                            Command="{Binding ImportBackgroundCommand}" />
+                                </Grid>
+                                <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+                                    <TextBox Text="{Binding NewBackgroundName, UpdateSourceTrigger=PropertyChanged}"
+                                             Width="160" />
+                                    <Button Content="重命名" Margin="8,0,0,0" Command="{Binding RenameBackgroundCommand}" />
+                                    <Button Content="删除" Margin="8,0,0,0" Command="{Binding DeleteBackgroundCommand}" />
+                                    <Button Content="打开背景文件夹" Margin="8,0,0,0"
+                                            Command="{Binding OpenBackgroundFolderCommand}" />
+                                </StackPanel>
+                                <TextBlock Style="{StaticResource Muted}" TextWrapping="Wrap"
+                                           Text="支持 png / jpg / jpeg / webp。也可以直接在背景文件夹内放入或重命名图片，切换到该背景时会自动识别。" />
+                                <Grid Margin="0,12,0,0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="120" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="显示方式" VerticalAlignment="Center" />
+                                    <ComboBox Grid.Column="1" SelectedIndex="{Binding SelectedBackgroundModeIndex, Mode=TwoWay}">
+                                        <ComboBoxItem Content="铺满覆盖（推荐，不留白）" Tag="2" />
+                                        <ComboBoxItem Content="铺满自适应（可能留白）" Tag="3" />
+                                        <ComboBoxItem Content="角落：右上角" Tag="0" />
+                                        <ComboBoxItem Content="角落：左下角" Tag="1" />
+                                    </ComboBox>
+                                </Grid>
+                                <Grid Margin="0,10,0,0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="120" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="透明度" VerticalAlignment="Center" />
+                                    <TextBox Grid.Column="1" Text="{Binding BackgroundOpacity, UpdateSourceTrigger=PropertyChanged}" />
+                                </Grid>
                             </StackPanel>
                         </Border>
 
@@ -1127,26 +1159,7 @@
                             </StackPanel>
                         </Border>
 
-                        <Border Style="{StaticResource Card}" Margin="0,0,0,14">
-                            <StackPanel>
-                                <TextBlock Text="清理旧记录" Style="{StaticResource CardTitle}" />
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="Auto" />
-                                        <ColumnDefinition Width="150" />
-                                        <ColumnDefinition Width="Auto" />
-                                        <ColumnDefinition Width="*" />
-                                    </Grid.ColumnDefinitions>
-                                    <TextBlock Text="删除该日期之前的全部记录：" Margin="0,0,10,0" />
-                                    <TextBox Grid.Column="1" Text="{Binding CleanupBeforeDay, UpdateSourceTrigger=PropertyChanged}" />
-                                    <Button Grid.Column="2" Content="清理…" Margin="10,0,0,0"
-                                            Command="{Binding CleanupCommand}" />
-                                    <TextBlock Grid.Column="3" Text="不可撤销，执行前会二次确认。" Margin="14,0,0,0"
-                                               Style="{StaticResource Muted}" />
-                                </Grid>
-                            </StackPanel>
-                        </Border>
-
+                        <!-- 隐私说明 -->
                         <Border Style="{StaticResource Card}" Margin="0,0,0,14">
                             <StackPanel>
                                 <TextBlock Text="隐私说明" Style="{StaticResource CardTitle}" />

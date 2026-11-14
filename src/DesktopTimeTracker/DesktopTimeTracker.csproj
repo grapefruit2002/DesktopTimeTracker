@@ -46,6 +46,11 @@
     <Resource Include="Assets\anime_bg.png" />
     <Resource Include="Assets\mascot.jpg" />
     <Resource Include="Assets\mascot.png" />
+    <!-- 三套主题文件保留为 Resource（不编译成 BAML），由 ThemeManager 运行时加载 -->
+    <Resource Include="Themes\Pink.xaml" />
+    <Resource Include="Themes\LightBlue.xaml" />
+    <Resource Include="Themes\Mint.xaml" />
+    <Resource Include="Themes\LightPurple.xaml" />
   </ItemGroup>
 
   <!-- 桌宠网页资源（three.js / three-vrm / html）复制到输出与发布目录 -->

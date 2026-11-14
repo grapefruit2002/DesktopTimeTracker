@@ -361,3 +361,11 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
+
+# WorkBuddy / Trae local data
+.workbuddy/
+.trae-html-share-packages/
+
+# Build output (distributed artifacts)
+dist/
+dist.zip

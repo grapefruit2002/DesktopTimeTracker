@@ -1,0 +1,36 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!-- ============ 薰衣草 ============ -->
+    <SolidColorBrush x:Key="WindowBrush" Color="#F6F3FB" />
+    <SolidColorBrush x:Key="WindowTopBrush" Color="#EFEAF8" />
+    <SolidColorBrush x:Key="CardBrush" Color="#CCFFFFFF" />
+    <SolidColorBrush x:Key="CardAltBrush" Color="#D6CEF3FB" />
+    <SolidColorBrush x:Key="CardElevatedBrush" Color="#F2FFFFFF" />
+    <SolidColorBrush x:Key="HoverBrush" Color="#99DCD3F5" />
+    <SolidColorBrush x:Key="BorderBrush" Color="#E3DBF1" />
+    <SolidColorBrush x:Key="BorderStrongBrush" Color="#C7B7E6" />
+    <SolidColorBrush x:Key="TrackBrush" Color="#8CD6CEF3" />
+    <SolidColorBrush x:Key="InputBrush" Color="#99F2EFFB" />
+    <SolidColorBrush x:Key="TextBrush" Color="#3E2C5E" />
+    <SolidColorBrush x:Key="SubTextBrush" Color="#6E5A8F" />
+    <SolidColorBrush x:Key="MutedBrush" Color="#A795BF" />
+    <SolidColorBrush x:Key="AccentBrush" Color="#8E6BDA" />
+    <SolidColorBrush x:Key="AccentBrightBrush" Color="#A78BE6" />
+    <SolidColorBrush x:Key="AccentDimBrush" Color="#E8DEFA" />
+    <SolidColorBrush x:Key="CyanBrush" Color="#4FB3D9" />
+    <SolidColorBrush x:Key="CyanDimBrush" Color="#E2F4FB" />
+    <SolidColorBrush x:Key="GreenBrush" Color="#3FAF8B" />
+    <SolidColorBrush x:Key="AmberBrush" Color="#D99530" />
+    <SolidColorBrush x:Key="RedBrush" Color="#E05870" />
+    <SolidColorBrush x:Key="PurpleBrush" Color="#8E6BDA" />
+    <SolidColorBrush x:Key="PurpleDimBrush" Color="#E8DEFA" />
+    <SolidColorBrush x:Key="InfoBackgroundBrush" Color="#F0E9FB" />
+    <SolidColorBrush x:Key="InfoBorderBrush" Color="#D1C2F0" />
+    <SolidColorBrush x:Key="InfoTextBrush" Color="#6C4ABF" />
+    <SolidColorBrush x:Key="ErrorBackgroundBrush" Color="#FFECEF" />
+    <SolidColorBrush x:Key="ErrorBorderBrush" Color="#FFC2CC" />
+    <SolidColorBrush x:Key="ErrorTextBrush" Color="#C43A5E" />
+
+    <x:String x:Key="ThemeDisplayName">薰衣草</x:String>
+</ResourceDictionary>

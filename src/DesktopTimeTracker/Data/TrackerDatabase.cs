@@ -742,21 +742,6 @@ public sealed class TrackerDatabase : IDisposable
         return list;
     }
 
-    public int DeleteBefore(string day)
-    {
-        lock (_writeGate)
-        {
-            using var cmd = _write.CreateCommand();
-            cmd.CommandText = """
-                DELETE FROM app_sessions WHERE day < $day;
-                DELETE FROM web_sessions WHERE day < $day;
-                DELETE FROM daily_summary WHERE day < $day;
-                """;
-            cmd.Parameters.AddWithValue("$day", day);
-            return cmd.ExecuteNonQuery();
-        }
-    }
-
     public void Vacuum()
     {
         lock (_writeGate)

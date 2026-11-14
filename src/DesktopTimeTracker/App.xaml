@@ -10,6 +10,7 @@
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
                 <ResourceDictionary Source="Themes/Theme.xaml" />
+                <ResourceDictionary x:Name="ThemeDictionary" Source="Themes/Pink.xaml" />
             </ResourceDictionary.MergedDictionaries>
 
             <conv:DurationTextConverter x:Key="Duration" />

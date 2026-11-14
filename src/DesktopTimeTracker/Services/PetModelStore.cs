@@ -1,11 +1,22 @@
 using System.IO;
+using System.Security.Cryptography;
 using System.Text.Json;
 using DesktopTimeTracker.Models;
 
 namespace DesktopTimeTracker.Services;
 
+/// <summary>
+/// 桌宠模型文件的存储管理：
+/// - 模型统一存放在专门文件夹 <c>%APPDATA%\DesktopTimeTracker\Models\</c> 下
+/// - 文件名使用模型的可读名称（可随时在资源管理器里重命名，程序会自动识别）
+/// - 提供 导入 / 重命名 / 文件夹同步 三个能力
+/// </summary>
 public static class PetModelStore
 {
+    private static readonly string[] ModelExtensions = [".vrm"];
+
+    public static string ModelsDirectory(string storageFolder) => Path.Combine(storageFolder, "Models");
+
     public static PetModel Import(string sourcePath, string storageFolder)
     {
         if (!string.Equals(Path.GetExtension(sourcePath), ".vrm", StringComparison.OrdinalIgnoreCase))
@@ -15,23 +26,162 @@ public static class PetModelStore
         Validate(source);
         source.Position = 0;
 
-        var model = new PetModel(Guid.NewGuid().ToString("N"), Path.GetFileNameWithoutExtension(sourcePath));
-        string destination = Path.Combine(storageFolder, model.RelativePath);
+        string stem = Path.GetFileNameWithoutExtension(sourcePath);
+        var model = new PetModel(Guid.NewGuid().ToString("N"), stem);
+        string destination = UniqueDestination(storageFolder, model);
+        model = model with { FileName = Path.GetFileName(destination) };
+
         Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
-        using var target = new FileStream(destination, FileMode.CreateNew, FileAccess.Write, FileShare.None);
-        try
+        using (var target = new FileStream(destination, FileMode.CreateNew, FileAccess.Write, FileShare.None))
         {
             source.CopyTo(target);
             target.Flush(true);
         }
-        catch
-        {
-            target.Dispose();
-            File.Delete(destination);
-            throw;
-        }
         return model;
     }
+
+    /// <summary>重命名模型：显示名称与物理文件一起改名。</summary>
+    public static PetModel Rename(string storageFolder, PetModel model, string newName)
+    {
+        string stem = SanitizeName(newName);
+        if (stem.Length == 0) throw new InvalidDataException("新名称不能为空。");
+
+        string oldPath = Path.Combine(storageFolder, model.RelativePath);
+        string newFileName = UniqueFileName(storageFolder, stem, model.FileNameOrDefault);
+        string newPath = Path.Combine(ModelsDirectory(storageFolder), newFileName);
+
+        if (!string.Equals(oldPath, newPath, StringComparison.OrdinalIgnoreCase) && File.Exists(oldPath))
+            File.Move(oldPath, newPath);
+
+        return model with { Name = newName.Trim(), FileName = newFileName };
+    }
+
+    /// <summary>
+    /// 同步 Models 文件夹：扫描里面的 *.vrm，自动登记新文件，
+    /// 并识别“在资源管理器里改名”的情况（旧文件消失 + 出现一个未登记的新文件）。
+    /// 返回同步后的完整模型列表。
+    /// </summary>
+    public static IReadOnlyList<PetModel> SyncFromFolder(string storageFolder, IReadOnlyList<PetModel> known)
+    {
+        string modelsDir = ModelsDirectory(storageFolder);
+
+        try { Directory.CreateDirectory(modelsDir); }
+        catch { return []; }
+
+        var imported = known.Where(m => m.Id != PetModel.DefaultId).ToList();
+        var claimedStems = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        // ① 已登记模型：按 FileNameOrDefault 对号入座
+        var result = new List<PetModel>();
+        var orphans = new List<PetModel>();
+        foreach (var model in imported)
+        {
+            string path = Path.Combine(storageFolder, model.RelativePath);
+            if (File.Exists(path))
+            {
+                claimedStems.Add(Path.GetFileNameWithoutExtension(path).ToLowerInvariant());
+                result.Add(model.FileName is null ? model with { FileName = model.FileNameOrDefault } : model);
+            }
+            else
+            {
+                orphans.Add(model); // 文件不见了（可能被手动改名）
+            }
+        }
+
+        // ② 未登记的文件：优先配给“文件消失”的模型（识别改名），其余作为新模型登记
+        List<string> unclaimed;
+        try
+        {
+            unclaimed = Directory.EnumerateFiles(modelsDir, "*.vrm")
+                .Where(f => !claimedStems.Contains(Path.GetFileNameWithoutExtension(f).ToLowerInvariant()))
+                .Select(f => Path.GetFileNameWithoutExtension(f))
+                .OrderBy(n => n, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+        }
+        catch
+        {
+            unclaimed = [];
+        }
+
+        int pairCount = Math.Min(orphans.Count, unclaimed.Count);
+        for (int i = 0; i < pairCount; i++)
+        {
+            var orphan = orphans[i];
+            string stem = unclaimed[i];
+            claimedStems.Add(stem.ToLowerInvariant());
+            result.Add(orphan with
+            {
+                Name = stem,
+                FileName = stem + ".vrm"
+            });
+        }
+
+        foreach (string stem in unclaimed.Skip(pairCount))
+        {
+            claimedStems.Add(stem.ToLowerInvariant());
+            string id = StableId(stem);
+            if (result.Any(m => m.Id == id) || known.Any(m => m.Id == id)) continue;
+            result.Add(new PetModel(id, stem, stem + ".vrm"));
+        }
+
+        // 顺序：按名称排序，方便在设置里挑选
+        return result
+            .OrderBy(m => m.Id == PetModel.DefaultId ? 0 : 1)
+            .ThenBy(m => m.Name, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+
+    /// <summary>由名称生成稳定的 32 位模型 Id（重命名文件后 Id 保持不变）。</summary>
+    private static string StableId(string stem)
+    {
+        using var md5 = MD5.Create();
+        var hash = md5.ComputeHash(System.Text.Encoding.UTF8.GetBytes("petmodel:" + stem.ToLowerInvariant()));
+        return new Guid(hash).ToString("N");
+    }
+
+    private static string SanitizeName(string name)
+    {
+        foreach (char c in Path.GetInvalidFileNameChars()) name = name.Replace(c, '_');
+        name = name.Trim().TrimEnd('.').Trim();
+        // 字符宽度限制：汉字算 2，英文算 1，上限 20（≈10 个汉字）
+        return BackgroundImageStore.ClampByWidth(name, 20);
+    }
+
+    /// <summary>在 Models 文件夹里生成不重名的目标文件名。</summary>
+    private static string UniqueFileName(string storageFolder, string stem, string? currentFileName)
+    {
+        string dir = ModelsDirectory(storageFolder);
+        string candidate = stem + ".vrm";
+        string current = string.IsNullOrWhiteSpace(currentFileName) ? "" : currentFileName;
+
+        if (!File.Exists(Path.Combine(dir, candidate)) ||
+            string.Equals(candidate, current, StringComparison.OrdinalIgnoreCase))
+            return candidate;
+
+        for (int n = 2; ; n++)
+        {
+            candidate = $"{stem} ({n}).vrm";
+            if (!File.Exists(Path.Combine(dir, candidate))) return candidate;
+        }
+    }
+
+    /// <summary>同上，但用于导入时（目标文件一定不存在）。</summary>
+    private static string UniqueDestination(string storageFolder, PetModel model)
+    {
+        string dir = ModelsDirectory(storageFolder);
+        string candidate = Path.Combine(dir, model.FileNameOrDefault);
+        Directory.CreateDirectory(dir);
+
+        if (!File.Exists(candidate)) return candidate;
+        string stem = Path.GetFileNameWithoutExtension(model.FileNameOrDefault);
+        for (int n = 2; ; n++)
+        {
+            candidate = Path.Combine(dir, $"{stem} ({n}).vrm");
+            if (!File.Exists(candidate)) return candidate;
+        }
+    }
+
+    // ---------------- VRM 校验 ----------------
 
     private static void Validate(Stream stream)
     {

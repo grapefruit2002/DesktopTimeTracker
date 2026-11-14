@@ -18,6 +18,7 @@ public sealed class MainViewModel : ViewModelBase, IDisposable
     private readonly ActivityTracker _tracker;
     private readonly DispatcherTimer _timer;
     private TrackerSettings _settings;
+    public TrackerSettings Settings => _settings;
 
     private int _refreshBusy;
     private DateTime _lastRefresh = DateTime.MinValue;
@@ -36,12 +37,19 @@ public sealed class MainViewModel : ViewModelBase, IDisposable
         NextDayCommand = new RelayCommand(() => ShiftDay(1));
         SaveSettingsCommand = new RelayCommand(SaveSettings, () => !IsImportingPetModel);
         ImportPetModelCommand = new RelayCommand(ImportPetModel, () => !IsImportingPetModel);
+        RenamePetModelCommand = new RelayCommand(RenamePetModel, () => !IsImportingPetModel);
+        OpenModelsFolderCommand = new RelayCommand(OpenModelsFolder);
+        OpenBackgroundFolderCommand = new RelayCommand(OpenBackgroundFolder);
         OpenDatabaseFolderCommand = new RelayCommand(OpenDatabaseFolder);
         ChangeDatabasePathCommand = new RelayCommand(ChangeDatabasePath);
         OpenUrlCommand = new RelayCommand(p => OpenUrl(p as string));
-        CleanupCommand = new RelayCommand(Cleanup);
         VacuumCommand = new RelayCommand(Vacuum);
         ExportCsvCommand = new RelayCommand(ExportCsv);
+        ImportBackgroundCommand = new RelayCommand(ImportBackground);
+        RenameBackgroundCommand = new RelayCommand(RenameBackground);
+        DeleteBackgroundCommand = new RelayCommand(DeleteBackground);
+        SyncBackgroundsCommand = new RelayCommand(() => SyncBackgrounds());
+        NavigateToSettingsCommand = new RelayCommand(p => NavigateToSettings(p as string));
         SelectDayCommand = new RelayCommand(p =>
         {
             if (p is string day && day.Length > 0) SelectedDay = day;
@@ -59,7 +67,6 @@ public sealed class MainViewModel : ViewModelBase, IDisposable
         _startMinimized = settings.StartMinimized;
         _autoStart = AutoStartService.IsEnabled();
         _ignoredProcessesText = string.Join(", ", settings.IgnoredProcesses);
-        _cleanupBeforeDay = DateTime.Now.AddDays(-30).ToString("yyyy-MM-dd");
         _breakReminderMinutes = settings.BreakReminderMinutes;
         _dailyGoalMinutes = settings.DailyGoalMinutes;
         _waterReminderEnabled = settings.WaterReminderEnabled;
@@ -69,6 +76,13 @@ public sealed class MainViewModel : ViewModelBase, IDisposable
         _petMenuLinesText = string.Join(Environment.NewLine, settings.PetMenuLines);
         foreach (PetModel model in settings.PetModels) PetModelChoices.Add(model);
         _selectedPetModelId = settings.SelectedPetModelId;
+        SyncPetModels();
+        foreach (BackgroundImage bg in settings.BackgroundImages) BackgroundChoices.Add(bg);
+        _selectedBackgroundId = string.IsNullOrWhiteSpace(settings.SelectedBackgroundId) ? BackgroundImage.DefaultId : settings.SelectedBackgroundId;
+        _selectedBackgroundMode = (BackgroundMode)settings.BackgroundMode;
+        _backgroundOpacity = settings.BackgroundOpacity;
+        _backgroundOpacityText = _backgroundOpacity.ToString("0.##");
+        SyncBackgrounds();
         _categoryRulesText = string.Join(Environment.NewLine,
             settings.CategoryRules.OrderBy(kv => kv.Key).Select(kv => $"{kv.Key}={kv.Value}"));
         _flushIntervalText = $"数据每 {settings.FlushIntervalSeconds} 秒落盘一次 · 关闭窗口不会停止记录";
@@ -312,9 +326,6 @@ public sealed class MainViewModel : ViewModelBase, IDisposable
     private string _ignoredProcessesText = "";
     public string IgnoredProcessesText { get => _ignoredProcessesText; set => SetField(ref _ignoredProcessesText, value); }
 
-    private string _cleanupBeforeDay = "";
-    public string CleanupBeforeDay { get => _cleanupBeforeDay; set => SetField(ref _cleanupBeforeDay, value); }
-
     private string _settingsStatusText = "";
     public string SettingsStatusText { get => _settingsStatusText; private set => SetField(ref _settingsStatusText, value); }
 
@@ -368,8 +379,89 @@ public sealed class MainViewModel : ViewModelBase, IDisposable
     private string _petModelStatusText = "";
     public string PetModelStatusText { get => _petModelStatusText; private set => SetField(ref _petModelStatusText, value); }
 
+    private string _newPetModelName = "";
+    public string NewPetModelName { get => _newPetModelName; set => SetField(ref _newPetModelName, value); }
+
+    public ObservableCollection<BackgroundImage> BackgroundChoices { get; } = [BackgroundImage.None];
+
+    private string _selectedBackgroundId = BackgroundImage.DefaultId;
+    public string SelectedBackgroundId
+    {
+        get => _selectedBackgroundId;
+        set
+        {
+            if (!SetField(ref _selectedBackgroundId, value)) return;
+            BackgroundStatusText = "已切换背景。";
+        }
+    }
+
+    private BackgroundMode _selectedBackgroundMode = BackgroundMode.FillCover;
+    public BackgroundMode SelectedBackgroundMode
+    {
+        get => _selectedBackgroundMode;
+        set
+        {
+            if (!SetField(ref _selectedBackgroundMode, value)) return;
+            BackgroundStatusText = "已切换布局方式。";
+        }
+    }
+
+    public int SelectedBackgroundModeIndex
+    {
+        get => _selectedBackgroundMode switch
+        {
+            BackgroundMode.FillCover => 0,
+            BackgroundMode.FillUniform => 1,
+            BackgroundMode.CornerTopRight => 2,
+            BackgroundMode.CornerBottomLeft => 3,
+            _ => 0,
+        };
+        set
+        {
+            SelectedBackgroundMode = value switch
+            {
+                0 => BackgroundMode.FillCover,
+                1 => BackgroundMode.FillUniform,
+                2 => BackgroundMode.CornerTopRight,
+                3 => BackgroundMode.CornerBottomLeft,
+                _ => BackgroundMode.FillCover,
+            };
+        }
+    }
+
+    private double _backgroundOpacity = 0.52;
+    public double BackgroundOpacity
+    {
+        get => _backgroundOpacity;
+        set
+        {
+            if (!SetField(ref _backgroundOpacity, value)) return;
+            BackgroundStatusText = "点击下方“保存设置”应用所选透明度。";
+        }
+    }
+
+    private string _backgroundOpacityText = "0.52";
+    public string BackgroundOpacityText
+    {
+        get => _backgroundOpacityText;
+        set
+        {
+            if (!SetField(ref _backgroundOpacityText, value)) return;
+            if (double.TryParse(value, System.Globalization.NumberStyles.Float,
+                    System.Globalization.CultureInfo.InvariantCulture, out double d))
+                BackgroundOpacity = Math.Clamp(d, 0.05, 1.0);
+        }
+    }
+
+    private string _newBackgroundName = "";
+    public string NewBackgroundName { get => _newBackgroundName; set => SetField(ref _newBackgroundName, value); }
+
+    private string _backgroundStatusText = "";
+    public string BackgroundStatusText { get => _backgroundStatusText; private set => SetField(ref _backgroundStatusText, value); }
+
     public event Action<TrackerSettings>? SettingsSaved;
     public event Action<bool>? ShowPetChanged;
+    public event Action? BackgroundChanged;
 
     private bool _showPet = true;
     public bool ShowPet
@@ -410,10 +502,17 @@ public sealed class MainViewModel : ViewModelBase, IDisposable
     public RelayCommand OpenDatabaseFolderCommand { get; }
     public RelayCommand ChangeDatabasePathCommand { get; }
     public RelayCommand OpenUrlCommand { get; }
-    public RelayCommand CleanupCommand { get; }
     public RelayCommand VacuumCommand { get; }
     public RelayCommand SelectDayCommand { get; }
     public RelayCommand ExportCsvCommand { get; }
+    public RelayCommand RenamePetModelCommand { get; }
+    public RelayCommand OpenModelsFolderCommand { get; }
+    public RelayCommand OpenBackgroundFolderCommand { get; }
+    public RelayCommand ImportBackgroundCommand { get; }
+    public RelayCommand RenameBackgroundCommand { get; }
+    public RelayCommand DeleteBackgroundCommand { get; }
+    public RelayCommand SyncBackgroundsCommand { get; }
+    public RelayCommand NavigateToSettingsCommand { get; }
 
     public void ReportError(string message)
     {
@@ -674,9 +773,255 @@ public sealed class MainViewModel : ViewModelBase, IDisposable
 
     public void ReportPetModelStatus(string message) => PetModelStatusText = message;
 
+    /// <summary>扫描专门的 Models 文件夹：登记新模型、识别手动改名，并更新设置。</summary>
+    public void SyncPetModels()
+    {
+        try
+        {
+            IReadOnlyList<PetModel> synced = PetModelStore.SyncFromFolder(
+                TrackerSettings.DefaultFolder, _settings.PetModels);
+
+            bool changed = synced.Count != _settings.PetModels.Count ||
+                synced.Zip(_settings.PetModels).Any(pair =>
+                    pair.First.Id != pair.Second.Id ||
+                    !string.Equals(pair.First.Name, pair.Second.Name, StringComparison.Ordinal) ||
+                    !string.Equals(pair.First.FileName, pair.Second.FileName, StringComparison.Ordinal));
+
+            if (!changed) return;
+
+            _settings.PetModels = synced.ToList();
+            try { _settings.Save(); } catch (Exception) { }
+
+            PetModelChoices.Clear();
+            foreach (PetModel model in synced) PetModelChoices.Add(model);
+            if (PetModelChoices.All(m => m.Id != _selectedPetModelId))
+                _selectedPetModelId = PetModelChoices.FirstOrDefault()?.Id ?? PetModel.DefaultId;
+            RaisePropertyChanged(nameof(SelectedPetModelId));
+        }
+        catch (Exception ex)
+        {
+            PetModelStatusText = $"同步模型文件夹失败：{ex.Message}";
+        }
+    }
+
+    private void RenamePetModel()
+    {
+        if (IsImportingPetModel) return;
+
+        PetModel? model = PetModelChoices.FirstOrDefault(item => item.Id == SelectedPetModelId);
+        if (model is null || model.Id == PetModel.DefaultId)
+        {
+            PetModelStatusText = "默认人物不可重命名，请先选择一个导入的模型。";
+            return;
+        }
+
+        string newName = NewPetModelName?.Trim() ?? "";
+        if (newName.Length == 0)
+        {
+            PetModelStatusText = "请先在输入框中填写新名称。";
+            return;
+        }
+
+        try
+        {
+            PetModel renamed = PetModelStore.Rename(TrackerSettings.DefaultFolder, model, newName);
+            int index = _settings.PetModels.FindIndex(m => m.Id == renamed.Id);
+            if (index >= 0) _settings.PetModels[index] = renamed; else _settings.PetModels.Add(renamed);
+            _settings.Save();
+
+            for (int i = 0; i < PetModelChoices.Count; i++)
+                if (PetModelChoices[i].Id == renamed.Id) PetModelChoices[i] = renamed;
+
+            NewPetModelName = "";
+            PetModelStatusText = $"已重命名为“{renamed.Name}”，文件同步改名。";
+        }
+        catch (Exception ex)
+        {
+            PetModelStatusText = $"重命名失败：{ex.Message}";
+        }
+    }
+
+    private void OpenModelsFolder()
+    {
+        try
+        {
+            string dir = PetModelStore.ModelsDirectory(TrackerSettings.DefaultFolder);
+            Directory.CreateDirectory(dir);
+            Process.Start(new ProcessStartInfo("explorer.exe", $"\"{dir}\"") { UseShellExecute = true });
+        }
+        catch (Exception ex)
+        {
+            PetModelStatusText = $"打开文件夹失败：{ex.Message}";
+        }
+    }
+
+    // ---------- 背景相关 ----------
+
+    public void SyncBackgrounds()
+    {
+        try
+        {
+            IReadOnlyList<BackgroundImage> synced = BackgroundImageStore.SyncFromFolder(
+                TrackerSettings.DefaultFolder, _settings.BackgroundImages);
+
+            bool changed = synced.Count != BackgroundChoices.Count ||
+                synced.Zip(BackgroundChoices).Any(pair =>
+                    pair.First.Id != pair.Second.Id ||
+                    !string.Equals(pair.First.Name, pair.Second.Name, StringComparison.Ordinal) ||
+                    !string.Equals(pair.First.FileName, pair.Second.FileName, StringComparison.Ordinal));
+
+            if (!changed) return;
+
+            _settings.BackgroundImages = synced
+                .Where(b => BackgroundImage.IsImportedId(b.Id))
+                .ToList();
+            try { _settings.Save(); } catch (Exception) { }
+
+            BackgroundChoices.Clear();
+            foreach (BackgroundImage bg in synced) BackgroundChoices.Add(bg);
+
+            // 校正 SelectedBackgroundId
+            if (BackgroundChoices.All(b => b.Id != _selectedBackgroundId))
+            {
+                // 所选背景已被删除 / 不在同步列表里 → 回退：默认背景 → 无背景
+                if (BackgroundChoices.Any(b => b.Id == BackgroundImage.DefaultId))
+                    _selectedBackgroundId = BackgroundImage.DefaultId;
+                else
+                    _selectedBackgroundId = BackgroundImage.NoneId;
+                RaisePropertyChanged(nameof(SelectedBackgroundId));
+            }
+        }
+        catch (Exception ex)
+        {
+            BackgroundStatusText = $"同步背景文件夹失败：{ex.Message}";
+        }
+    }
+
+    private void ImportBackground()
+    {
+        var dialog = new OpenFileDialog
+        {
+            Title = "导入背景图片",
+            Filter = "图片文件 (*.png;*.jpg;*.jpeg;*.webp)|*.png;*.jpg;*.jpeg;*.webp",
+            Multiselect = false,
+            CheckFileExists = true
+        };
+        if (dialog.ShowDialog() != true) return;
+
+        try
+        {
+            BackgroundImage bg = BackgroundImageStore.Import(dialog.FileName, TrackerSettings.DefaultFolder);
+            _settings.BackgroundImages.Add(bg);
+            try
+            {
+                _settings.Save();
+            }
+            catch
+            {
+                _settings.BackgroundImages.RemoveAll(item => item.Id == bg.Id);
+                try { BackgroundImageStore.Delete(TrackerSettings.DefaultFolder, bg); } catch { }
+                throw;
+            }
+            SyncBackgrounds();
+            SelectedBackgroundId = bg.Id;
+            BackgroundStatusText = $"已导入“{bg.Name}”，点击下方“保存设置”应用。";
+        }
+        catch (Exception ex)
+        {
+            BackgroundStatusText = $"导入失败：{ex.Message}";
+        }
+    }
+
+    private void RenameBackground()
+    {
+        BackgroundImage? bg = BackgroundChoices.FirstOrDefault(item => item.Id == SelectedBackgroundId);
+        if (bg is null || bg.Id == BackgroundImage.DefaultId || bg.Id == BackgroundImage.NoneId)
+        {
+            BackgroundStatusText = "默认背景和无背景选项不可重命名。";
+            return;
+        }
+
+        string newName = NewBackgroundName?.Trim() ?? "";
+        if (newName.Length == 0)
+        {
+            BackgroundStatusText = "请先在输入框中填写新名称。";
+            return;
+        }
+
+        try
+        {
+            BackgroundImage renamed = BackgroundImageStore.Rename(TrackerSettings.DefaultFolder, bg, newName);
+            int index = _settings.BackgroundImages.FindIndex(b => b.Id == renamed.Id);
+            if (index >= 0) _settings.BackgroundImages[index] = renamed; else _settings.BackgroundImages.Add(renamed);
+            _settings.Save();
+            SyncBackgrounds();
+            NewBackgroundName = "";
+            BackgroundStatusText = $"已重命名为“{renamed.Name}”。";
+        }
+        catch (Exception ex)
+        {
+            BackgroundStatusText = $"重命名失败：{ex.Message}";
+        }
+    }
+
+    private void DeleteBackground()
+    {
+        BackgroundImage? bg = BackgroundChoices.FirstOrDefault(item => item.Id == SelectedBackgroundId);
+        if (bg is null || bg.Id == BackgroundImage.DefaultId || bg.Id == BackgroundImage.NoneId)
+        {
+            BackgroundStatusText = "默认背景和无背景选项不可删除。";
+            return;
+        }
+
+        var answer = MessageBox.Show(
+            $"确定要删除背景“{bg.Name}”吗？此操作不可撤销。",
+            "删除背景", MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No);
+        if (answer != MessageBoxResult.Yes) return;
+
+        try
+        {
+            BackgroundImageStore.Delete(TrackerSettings.DefaultFolder, bg);
+            _settings.BackgroundImages.RemoveAll(item => item.Id == bg.Id);
+            _settings.Save();
+            SyncBackgrounds();
+            // 选下一个可用的
+            SelectedBackgroundId = BackgroundImage.DefaultId;
+            BackgroundStatusText = $"已删除“{bg.Name}”。";
+        }
+        catch (Exception ex)
+        {
+            BackgroundStatusText = $"删除失败：{ex.Message}";
+        }
+    }
+
+    // ---------- 内部导航 ----------
+
+    private void NavigateToSettings(string? hint)
+    {
+        SelectedTabIndex = 5; // "设置" Tab
+    }
+
+    // ---------- 打开背景文件夹 ----------
+
+    private void OpenBackgroundFolder()
+    {
+        try
+        {
+            string dir = BackgroundImageStore.BackgroundsDirectory(TrackerSettings.DefaultFolder);
+            Directory.CreateDirectory(dir);
+            Process.Start(new ProcessStartInfo("explorer.exe", $"\"{dir}\"") { UseShellExecute = true });
+        }
+        catch (Exception ex)
+        {
+            BackgroundStatusText = $"打开文件夹失败：{ex.Message}";
+        }
+    }
+
     private void SaveSettings()
     {
         if (IsImportingPetModel) return;
+        SyncPetModels(); // 保存前先扫描模型文件夹（可能刚放入或改名了文件）
+        SyncBackgrounds(); // 背景文件夹同理
         try
         {
             PetModel model = PetModelChoices.FirstOrDefault(item => item.Id == SelectedPetModelId) ?? PetModel.Default;
@@ -705,14 +1050,30 @@ public sealed class MainViewModel : ViewModelBase, IDisposable
                 .Split([',', '，', ';', '；', '\n', '\r', ' '], StringSplitOptions.RemoveEmptyEntries)
                 .ToList();
             _settings.CategoryRules = ParseCategoryRules(CategoryRulesText);
+
+            // 背景：NoneId 不需要文件，DefaultId 对应 anime_bg.png，ImportedId 对应用户导入的
+            BackgroundImage bg = BackgroundChoices.FirstOrDefault(item => item.Id == SelectedBackgroundId) ?? BackgroundImage.Default;
+            _settings.BackgroundImages = BackgroundChoices
+                .Where(b => BackgroundImage.IsImportedId(b.Id)) // 只存导入的，内置两个选项不进 JSON
+                .ToList();
+            _settings.SelectedBackgroundId = bg.Id;
+            _settings.BackgroundMode = (int)SelectedBackgroundMode;
+            _settings.BackgroundOpacity = BackgroundOpacity;
+            _settings.ThemeName = Settings.ThemeName;
+
             _settings.Save();
             _settings = TrackerSettings.Load();
             _tracker.ApplySettings(_settings);
             PetClickLinesText = string.Join(Environment.NewLine, _settings.PetClickLines);
             PetMenuLinesText = string.Join(Environment.NewLine, _settings.PetMenuLines);
             SelectedPetModelId = _settings.SelectedPetModelId;
+            SelectedBackgroundId = _settings.SelectedBackgroundId;
+            SelectedBackgroundMode = (BackgroundMode)_settings.BackgroundMode;
+            BackgroundOpacity = _settings.BackgroundOpacity;
+            BackgroundOpacityText = BackgroundOpacity.ToString("0.##");
             PetModelStatusText = ShowPet ? "人物选择已保存。" : "人物选择已保存，显示桌宠时生效。";
             SettingsSaved?.Invoke(_settings);
+            BackgroundChanged?.Invoke();
             FlushIntervalText = $"数据每 {_settings.FlushIntervalSeconds} 秒落盘一次 · 关闭窗口不会停止记录";
 
             AutoStartService.Set(AutoStartWithWindows);
@@ -789,29 +1150,6 @@ public sealed class MainViewModel : ViewModelBase, IDisposable
         if (uri.Scheme is not ("http" or "https" or "chrome" or "edge" or "about" or "chrome-extension")) return;
         try { Process.Start(new ProcessStartInfo(uri.AbsoluteUri) { UseShellExecute = true }); }
         catch (Exception) { }
-    }
-
-    private void Cleanup()
-    {
-        if (!DateTime.TryParse(CleanupBeforeDay, out DateTime before))
-        {
-            MessageBox.Show("请输入有效日期，格式 yyyy-MM-dd。", "清理记录", MessageBoxButton.OK, MessageBoxImage.Warning);
-            return;
-        }
-        string day = before.ToString("yyyy-MM-dd");
-        var answer = MessageBox.Show(
-            $"将永久删除 {day} 之前的全部应用、网页与每日汇总记录。\n\n此操作不可撤销，建议先备份 data.db。是否继续？",
-            "确认清理", MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No);
-        if (answer != MessageBoxResult.Yes) return;
-
-        try
-        {
-            int affected = _db.DeleteBefore(day);
-            _db.Vacuum();
-            SettingsStatusText = $"已清理 {affected} 行。";
-            _ = RefreshDataAsync(true);
-        }
-        catch (Exception ex) { SettingsStatusText = $"清理失败：{ex.Message}"; }
     }
 
     private void Vacuum()

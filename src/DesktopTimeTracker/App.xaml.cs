@@ -53,6 +53,7 @@ public partial class App : Application
         };
 
         TrackerSettings settings = TrackerSettings.Load();
+        ThemeManager.Apply(settings.ThemeName);
         EnsureAutoStartDefault(settings);
         _db = OpenDatabase(settings);
         if (_db is null)

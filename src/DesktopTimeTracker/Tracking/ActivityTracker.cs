@@ -180,57 +180,63 @@ public sealed class ActivityTracker : IDisposable
         double unconfirmedActive = 0;
         bool wasAway = true;
 
+        // 后台线程的任何未捕获异常都会直接杀进程——整个循环包 try/catch
         while (!ct.IsCancellationRequested)
         {
-            int delay = _running ? _settings.PollIntervalMs : 500;
-            if (ct.WaitHandle.WaitOne(delay)) break;
-            if (!_running) { lastTick = DateTime.Now; continue; }
-            // Asleep (or Modern Standby): record nothing, keep the time base fresh so the
-            // resume tick does not credit the sleep gap to active or away.
-            if (_suspended) { lastTick = DateTime.Now; continue; }
-
-            var now = DateTime.Now;
-            double rawElapsed = (now - lastTick).TotalSeconds;
-            lastTick = now;
-            if (rawElapsed <= 0) continue;
-
-            // First tick after wake: the interval spans the sleep tail, so discard it
-            // entirely (even a short sleep that would slip under the gap tolerance).
-            if (_resumePending)
-            {
-                _resumePending = false;
-                unconfirmedActive = 0;
-                wasAway = true;
-                _urlReader.Invalidate();
-                continue;
-            }
-
-            // A gap this large means the machine slept or the thread stalled; the interval
-            // belongs to nobody, so drop it and start fresh sessions afterwards.
-            double tolerance = Math.Max(5.0, _settings.PollIntervalMs / 1000.0 * 4);
-            if (rawElapsed > tolerance)
-            {
-                lock (_flushGate)
-                {
-                    CloseApp(now);
-                    CloseWeb(now);
-                    FlushDay();
-                }
-                unconfirmedActive = 0;
-                wasAway = true;
-                _urlReader.Invalidate();
-                continue;
-            }
-
             try
             {
-                Tick(now, rawElapsed, ref previousInputTick, ref unconfirmedActive, ref wasAway);
-                _lastError = null;
+                int delay = _running ? _settings.PollIntervalMs : 500;
+                if (ct.WaitHandle.WaitOne(delay)) break;
+                if (!_running) { lastTick = DateTime.Now; continue; }
+                if (_suspended) { lastTick = DateTime.Now; continue; }
+
+                var now = DateTime.Now;
+                double rawElapsed = (now - lastTick).TotalSeconds;
+                lastTick = now;
+                if (rawElapsed <= 0) continue;
+
+                if (_resumePending)
+                {
+                    _resumePending = false;
+                    unconfirmedActive = 0;
+                    wasAway = true;
+                    _urlReader.Invalidate();
+                    continue;
+                }
+
+                double tolerance = Math.Max(5.0, _settings.PollIntervalMs / 1000.0 * 4);
+                if (rawElapsed > tolerance)
+                {
+                    lock (_flushGate)
+                    {
+                        CloseApp(now);
+                        CloseWeb(now);
+                        FlushDay();
+                    }
+                    unconfirmedActive = 0;
+                    wasAway = true;
+                    _urlReader.Invalidate();
+                    continue;
+                }
+
+                try
+                {
+                    Tick(now, rawElapsed, ref previousInputTick, ref unconfirmedActive, ref wasAway);
+                    _lastError = null;
+                }
+                catch (Exception ex)
+                {
+                    _lastError = $"{ex.GetType().Name}: {ex.Message}";
+                    System.Diagnostics.Debug.WriteLine(ex);
+                }
             }
             catch (Exception ex)
             {
-                _lastError = $"{ex.GetType().Name}: {ex.Message}";
-                Debug.WriteLine(ex);
+                // 循环顶层异常：记录 + 跳过本 tick 继续跑
+                _lastError = $"LoopTop: {ex.GetType().Name}: {ex.Message}";
+                System.Diagnostics.Debug.WriteLine(ex);
+                // 防止异常风暴：让线程喘口气
+                Thread.Sleep(1000);
             }
         }
     }

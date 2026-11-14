@@ -133,10 +133,16 @@ function fitCameraTo(box) {
     return targetY;
 }
 
-const requestedModel = new URLSearchParams(window.location.search).get('model');
+const params = new URLSearchParams(window.location.search);
+const requestedModel = params.get('model');
 const modelId = /^[a-f0-9]{32}$/.test(requestedModel || '') ? requestedModel : 'default';
-const defaultModelUrl = 'https://avatar.local/avatar.vrm';
-const modelUrl = modelId === 'default' ? defaultModelUrl : `https://avatar.local/Models/${modelId}.vrm`;
+// 导入模型按可读文件名存放（C# 端传入 file 参数）；拒绝任何带路径成分的值。
+const requestedFile = params.get('file') || '';
+const safeFile = /^[^/\\?#%]*\.vrm$/i.test(requestedFile) ? requestedFile : '';
+const defaultModelUrl = 'https://avatar.local/Models/avatar.vrm';
+const modelUrl = modelId === 'default'
+    ? defaultModelUrl
+    : `https://avatar.local/Models/${encodeURIComponent(safeFile || modelId + '.vrm')}`;
 const manager = new THREE.LoadingManager();
 manager.setURLModifier(url => {
     if (url === modelUrl || url === defaultModelUrl || /^(data:|blob:)/i.test(url)) return url;

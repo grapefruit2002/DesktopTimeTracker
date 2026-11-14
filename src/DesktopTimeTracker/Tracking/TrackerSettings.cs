@@ -36,6 +36,8 @@ public sealed class TrackerSettings
     /// <summary>喝水提醒的整点小时列表，逗号分隔，例如 "10,11,14,15,16,17"。</summary>
     public string WaterReminderHours { get; set; } = "10,11,14,15,16,17";
 
+
+
     /// <summary>每日活跃目标（分钟），0 = 关闭。</summary>
     public int DailyGoalMinutes { get; set; } = 0;
 
@@ -69,6 +71,12 @@ public sealed class TrackerSettings
     public List<PetModel> PetModels { get; set; } = [];
     public string SelectedPetModelId { get; set; } = PetModel.DefaultId;
 
+    public List<BackgroundImage> BackgroundImages { get; set; } = [];
+    public string SelectedBackgroundId { get; set; } = BackgroundImage.DefaultId;
+    public int BackgroundMode { get; set; } = (int)Models.BackgroundMode.FillCover;
+    public double BackgroundOpacity { get; set; } = 0.52;
+    public string ThemeName { get; set; } = "Pink";
+
     /// <summary>是否显示桌面小宠物。</summary>
     public bool ShowPet { get; set; } = true;
 
@@ -79,8 +87,11 @@ public sealed class TrackerSettings
     [JsonIgnore]
     public string SettingsPath { get; private set; } = "";
 
-    public static string DefaultFolder =>
-        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "DesktopTimeTracker");
+    /// <summary>
+    /// 所有运行期数据（设置、数据库、桌宠模型、日志）的根目录。
+    /// 放在程序集所在目录下，避免写入 C 盘用户目录，随 exe 一同迁移。
+    /// </summary>
+    public static string DefaultFolder => AppContext.BaseDirectory;
 
     public TrackerSettings Clamp()
     {
@@ -97,11 +108,22 @@ public sealed class TrackerSettings
         PetModels = (PetModels ?? [])
             .Where(model => model is not null && PetModel.IsImportedId(model.Id))
             .Select(model => new PetModel(model.Id.ToLowerInvariant(),
-                string.IsNullOrWhiteSpace(model.Name) ? "导入的人物" : model.Name.Trim()))
+                string.IsNullOrWhiteSpace(model.Name) ? "导入的人物" : model.Name.Trim(),
+                model.FileName))
             .DistinctBy(model => model.Id)
             .ToList();
         SelectedPetModelId = PetModels.FirstOrDefault(model =>
             string.Equals(model.Id, SelectedPetModelId, StringComparison.OrdinalIgnoreCase))?.Id ?? PetModel.DefaultId;
+        BackgroundImages = (BackgroundImages ?? [])
+            .Where(bg => bg is not null && BackgroundImage.IsImportedId(bg.Id))
+            .Select(bg => new BackgroundImage(bg.Id.ToLowerInvariant(),
+                string.IsNullOrWhiteSpace(bg.Name) ? "导入的背景" : bg.Name.Trim(),
+                bg.FileName))
+            .DistinctBy(bg => bg.Id)
+            .ToList();
+        BackgroundMode = Math.Clamp(BackgroundMode, (int)Models.BackgroundMode.CornerTopRight, (int)Models.BackgroundMode.FillUniform);
+        BackgroundOpacity = Math.Clamp(BackgroundOpacity, 0.05, 1.0);
+        // SelectedBackgroundId 可能是 DefaultId / NoneId / 某个 ImportedId，这里不清洗，由 SyncFromFolder 后的 ViewModel 层负责校正
         CategoryRules = CategoryRules
             .Where(kv => !string.IsNullOrWhiteSpace(kv.Key) && !string.IsNullOrWhiteSpace(kv.Value))
             .ToDictionary(kv => kv.Key.Trim().ToLowerInvariant(), kv => kv.Value.Trim(), StringComparer.OrdinalIgnoreCase);

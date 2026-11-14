@@ -21,6 +21,10 @@ public partial class PetWindow : Window
     private readonly Random _random = new();
     private WebView2CompositionControl? _web;
     private bool _ready;
+    private DateTime _lastSayAt = DateTime.MinValue;
+
+    /// <summary>点击说话冷却时间（毫秒）。</summary>
+    private const int SayCooldownMs = 2000;
 
     public event Action? OpenMainRequested;
     public event Action? HideRequested;
@@ -28,6 +32,7 @@ public partial class PetWindow : Window
     private IReadOnlyList<string> _clickLines;
     private IReadOnlyList<string> _menuLines;
     private string _modelId;
+    private TrackerSettings _settings;
 
     public PetWindow(Func<string?> statsTextProvider, TrackerSettings settings)
     {
@@ -36,6 +41,7 @@ public partial class PetWindow : Window
         _clickLines = settings.PetClickLines;
         _menuLines = settings.PetMenuLines;
         _modelId = settings.SelectedPetModelId;
+        _settings = settings;
 
         Loaded += OnLoaded;
     }
@@ -44,6 +50,7 @@ public partial class PetWindow : Window
     {
         _clickLines = settings.PetClickLines;
         _menuLines = settings.PetMenuLines;
+        _settings = settings;
         if (_modelId != settings.SelectedPetModelId)
         {
             _modelId = settings.SelectedPetModelId;
@@ -58,7 +65,16 @@ public partial class PetWindow : Window
         if (_web?.CoreWebView2 is not { } core) return;
         _ready = false;
         string id = PetModel.IsImportedId(_modelId) ? _modelId : PetModel.DefaultId;
-        core.Navigate("https://pet.local/index.html?model=" + id);
+        string url = "https://pet.local/index.html?model=" + id;
+        // 导入模型的文件按可读名称存放（Models\<名称>.vrm），把实际文件名传给页面拼 URL。
+        if (id != PetModel.DefaultId)
+        {
+            string? fileName = _settings.PetModels
+                .FirstOrDefault(m => string.Equals(m.Id, id, StringComparison.OrdinalIgnoreCase))?.FileNameOrDefault;
+            if (!string.IsNullOrWhiteSpace(fileName))
+                url += "&file=" + Uri.EscapeDataString(fileName);
+        }
+        core.Navigate(url);
     }
 
     private async void OnLoaded(object sender, RoutedEventArgs e)
@@ -83,8 +99,7 @@ public partial class PetWindow : Window
             core.Settings.IsSwipeNavigationEnabled = false;
 
             string webDir = Path.Combine(AppContext.BaseDirectory, "Assets", "Web");
-            string avatarDir = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "DesktopTimeTracker");
+            string avatarDir = TrackerSettings.DefaultFolder;
 
             core.SetVirtualHostNameToFolderMapping("pet.local", webDir, CoreWebView2HostResourceAccessKind.Allow);
             core.SetVirtualHostNameToFolderMapping("avatar.local", avatarDir, CoreWebView2HostResourceAccessKind.Allow);
@@ -173,10 +188,8 @@ public partial class PetWindow : Window
                     HideRequested?.Invoke();
                     break;
                 case "menu":
-                    ShowContextMenu();
-                    break;
                 case "tap":
-                    Say(_clickLines[_random.Next(_clickLines.Count)]);
+                    SayWithCooldown();
                     break;
             }
         }
@@ -186,26 +199,13 @@ public partial class PetWindow : Window
         }
     }
 
-    private void ShowContextMenu()
+    /// <summary>带冷却的点击说话：2 秒内只说一次，防卡死。</summary>
+    private void SayWithCooldown()
     {
-        var menu = new ContextMenu { Placement = PlacementMode.Mouse };
-
-        var sayItem = new MenuItem { Header = "说句话" };
-        sayItem.Click += (_, _) => Say(RandomLine());
-
-        var openItem = new MenuItem { Header = "打开统计面板" };
-        openItem.Click += (_, _) => OpenMainRequested?.Invoke();
-
-        var hideItem = new MenuItem { Header = "隐藏桌宠" };
-        hideItem.Click += (_, _) => HideRequested?.Invoke();
-
-        menu.Items.Add(sayItem);
-        menu.Items.Add(openItem);
-        menu.Items.Add(new Separator());
-        menu.Items.Add(hideItem);
-
-        menu.PlacementTarget = this;
-        menu.IsOpen = true;
+        var now = DateTime.Now;
+        if ((now - _lastSayAt).TotalMilliseconds < SayCooldownMs) return;
+        _lastSayAt = now;
+        Say(_clickLines[_random.Next(_clickLines.Count)]);
     }
 
     private string RandomLine()
@@ -231,5 +231,25 @@ public partial class PetWindow : Window
     {
         try { _web?.Dispose(); } catch (Exception) { }
         base.OnClosed(e);
+    }
+}
+
+/// <summary>桌宠相关的轻量日志（写入 %APPDATA%\DesktopTimeTracker\error.log）。</summary>
+internal static class PetLog
+{
+    public static void Write(Exception ex) => Write(ex.ToString());
+
+    public static void Write(string message)
+    {
+        try
+        {
+            string dir = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "DesktopTimeTracker");
+            Directory.CreateDirectory(dir);
+            File.AppendAllText(Path.Combine(dir, "error.log"),
+                $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] [PET] {message}\n");
+        }
+        catch (IOException) { }
+        catch (UnauthorizedAccessException) { }
     }
 }
