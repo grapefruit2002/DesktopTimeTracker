@@ -43,19 +43,25 @@
 - **头发 / 裙摆物理**：VRM SpringBone 实时摆动
 - **动作库**：双手背后晃、原地踏步、比心、抱手、叉腰、说话手势，每 7~15 秒随机切换
 - **鼠标跟随**：头、颈、胸分层跟随鼠标转动，身体也会轻微侧身
-- **互动**：单击说话（弹气泡 + 颜文字 + 开心表情 + 手势）、双击打开统计面板、右键菜单
+- **互动**：左键 / 右键单击都会说话（弹气泡 + 颜文字 + 开心表情 + 手势），2 秒冷却防卡死；双击打开统计面板
 - **操作**：左键拖动 360° 旋转、`Ctrl` + 拖动移动窗口、滚轮缩放已锁定
+- **多模型切换**：标题栏 🐾 按钮可切换 `Models/` 文件夹内的 VRM 模型
 - **位置记忆**：退出时保存位置，下次启动回到原处
 - **提醒联动**：久坐 / 喝水 / 目标达成时，她会同步说话
+
+### 主题与背景
+- **4 套主题**：樱花粉、冰海蓝、薄荷绿、薰衣草，标题栏 🎨 一键切换
+- **自定义背景**：支持 png / jpg / webp，标题栏 🖼 切换，4 种布局模式（铺满 / 等比 / 右上角 / 左下角）
+- **标题栏快捷按钮**：🎨主题 / 🐾桌宠模型 / 🖼背景 / 💾保存设置
 
 ### 其他
 - 系统托盘常驻，关闭窗口只隐藏不中断记录
 - 开机自启、启动最小化到托盘
 - 全局无边框窗口 + 自绘标题栏（最小化 / 最大化 / 关闭到托盘）
-- 二次元粉紫配色主题、半透明卡片
+- 多套配色主题、半透明卡片
 - CSV 导出当日应用 + 网页记录（UTF-8 BOM，Excel 直接打开不乱码）
 - 忽略指定进程（如 `explorer`、`SearchHost`）
-- 数据库位置自定义、一键压缩、按日期清理旧数据
+- 数据库位置自定义、一键压缩
 
 ---
 
@@ -104,11 +110,19 @@ dotnet publish src/DesktopTimeTracker/DesktopTimeTracker.csproj `
 
 ## ⚙️ 配置
 
-配置文件：`%APPDATA%\DesktopTimeTracker\settings.json`
+配置文件与数据均存储在 **exe 所在目录**（`AppContext.BaseDirectory`），便于绿色部署：
+
+```
+<exe 目录>/
+├─ settings.json        # 配置文件
+├─ data.db              # SQLite 数据库
+├─ Models/              # 桌宠 VRM 模型（可放多个，标题栏切换）
+└─ Backgrounds/         # 自定义背景图片
+```
 
 | 字段 | 说明 | 默认 |
 |---|---|---|
-| `DatabasePath` | 数据库文件路径 | `D:\data.db` |
+| `DatabasePath` | 数据库文件路径 | `<exe目录>/data.db` |
 | `PollIntervalMs` | 前台采样间隔（毫秒） | `1000` |
 | `IdleThresholdSeconds` | 离开判定阈值（秒） | `180` |
 | `FlushIntervalSeconds` | 会话落盘间隔（秒） | `5` |
@@ -123,19 +137,22 @@ dotnet publish src/DesktopTimeTracker/DesktopTimeTracker.csproj `
 | `CategoryRules` | 分类规则：`进程名/域名 → 分类` | 内置默认规则 |
 | `ShowPet` | 是否显示桌宠 | `true` |
 | `PetLeft` / `PetTop` | 桌宠窗口位置 | 自动右下角 |
+| `ThemeName` | 当前主题 | `Pink` |
+| `SelectedBackgroundId` | 选中的背景 | 默认背景 |
+| `BackgroundMode` | 背景布局模式 | `FillCover` |
+| `BackgroundOpacity` | 背景透明度 | `0.52` |
 
 ### 桌宠模型
-把 VRM 模型放到：
+把 VRM 模型放到 exe 目录下的 `Models/` 文件夹，支持多个模型：
 
 ```
-%APPDATA%\DesktopTimeTracker\avatar.vrm
+<exe 目录>/Models/
+├─ xxx.vrm
+├─ yyy.glb
+└─ idle.vrma          # 可选：烘焙动画
 ```
 
-支持 VRM 0.x / VRM 1.0（单文件 `.vrm` / `.glb`）。若想播放烘焙动画，另放一个 `.vrma`：
-
-```
-%APPDATA%\DesktopTimeTracker\idle.vrma
-```
+支持 VRM 0.x / VRM 1.0（单文件 `.vrm` / `.glb`）。若想播放烘焙动画，放一个 `.vrma`。通过标题栏 🐾 按钮切换模型。
 
 没有模型文件时，桌宠会退回一个程序化生成的 3D chibi 小人。
 
@@ -159,11 +176,17 @@ DesktopTimeTracker/
 │  ├─ Services/
 │  │  ├─ TrayIconService.cs      # 托盘图标与 Toast 通知
 │  │  ├─ AppCategorizer.cs       # 工作/娱乐/学习等分类
-│  │  ├─ AvatarLoader.cs         # glTF/VRM 解析（WPF 3D 回退渲染）
+│  │  ├─ ThemeManager.cs         # 主题加载与切换
+│  │  ├─ PetModelStore.cs        # 桌宠模型扫描与管理
+│  │  ├─ BackgroundImageStore.cs # 背景图片导入/删除/同步
 │  │  └─ AppIdentity.cs          # AUMID 与开始菜单快捷方式
+│  ├─ Models/
+│  │  ├─ Records.cs              # 数据记录模型
+│  │  ├─ PetModel.cs             # 桌宠模型
+│  │  └─ BackgroundImage.cs      # 背景图片模型
 │  ├─ Converters/                # 时长、百分比、图标、分类色等转换器
 │  ├─ Controls/                  # RoundedClip 等自定义控件
-│  ├─ Themes/Theme.xaml          # 配色与全部控件样式
+│  ├─ Themes/                    # 主题（Theme.xaml 骨架 + Pink/LightBlue/Mint/LightPurple）
 │  └─ Assets/
 │     ├─ app.ico / mascot.jpg    # 图标与立绘
 │     └─ Web/                    # 桌宠网页层（three.js / three-vrm / pet.js）
@@ -201,7 +224,7 @@ DesktopTimeTracker/
 - 所有数据只写入本机 SQLite 文件，程序**不联网、不上传**
 - 浏览器的无痕 / InPrivate 窗口只记录时长，网址统一替换为 `(隐私模式)`
 - 不读取网页内容，仅通过 UI Automation 读取地址栏文本
-- 可随时在设置中忽略指定进程，或清理历史记录
+- 可随时在设置中忽略指定进程
 
 ---
 
