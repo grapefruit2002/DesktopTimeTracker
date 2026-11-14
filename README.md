@@ -4,7 +4,11 @@
 
 所有数据只写入本机 SQLite 文件，**不联网、不上传、不读取网页内容**。
 
-![界面截图](shot1.png)
+<p align="center">
+  <img src="docs/screenshots/overview.jpg" alt="今日概览界面" width="880">
+  <br>
+  <sub>今日概览 · 活跃 / 离开时长、应用与网站排行一目了然</sub>
+</p>
 
 ---
 
